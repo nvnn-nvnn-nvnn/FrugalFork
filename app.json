@@ -28,11 +28,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
-          }
+          "backgroundColor": "#DD5A26"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SnackPlan uses your photos so you can add a picture of a dish you made."
         }
       ]
     ],
