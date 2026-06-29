@@ -439,14 +439,14 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   mealThumb: {
-    width: 52,
-    height: 52,
+    width: 44,
+    height: 44,
     borderRadius: Radius.sm,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emoji: { fontSize: 28, lineHeight: 34 },
+  emoji: { fontSize: 24, lineHeight: 30 },
   mealBody: { flex: 1, gap: Spacing.half },
   removeButton: {
     width: 32,

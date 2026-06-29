@@ -26,11 +26,11 @@ export const Colors = {
     onTint: '#FFFFFF',
   },
   dark: {
-    text: '#F3ECE0', // warm off-white
-    background: '#16120C', // warm near-black
-    backgroundElement: '#221C13',
-    backgroundSelected: '#30281C',
-    textSecondary: '#A99C88',
+    text: '#F1ECE4', // warm off-white
+    background: '#0C0B0A', // near-true black, faint warmth
+    backgroundElement: '#171513', // raised surface
+    backgroundSelected: '#221F1B',
+    textSecondary: '#9A9085',
     tint: '#EE7038', // a touch brighter for legibility on dark
     onTint: '#FFFFFF',
   },
@@ -69,10 +69,10 @@ export const Spacing = {
   half: 2,
   one: 4,
   two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+  three: 14,
+  four: 20,
+  five: 28,
+  six: 56,
 } as const;
 
 /**
@@ -94,9 +94,9 @@ export const Radius = {
   /** Chips, small insets, segmented-control thumbs. */
   sm: 4,
   /** Buttons, inputs, list rows. */
-  md: 8,
+  md: 7,
   /** Cards, sheets, the account/avatar tile. */
-  lg: 12,
+  lg: 10,
   /** Fully rounded — progress bars, true pills. */
   full: 999,
 } as const;

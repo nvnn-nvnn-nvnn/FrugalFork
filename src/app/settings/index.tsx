@@ -16,6 +16,7 @@ type MenuItem = {
 };
 
 const MENU: MenuItem[] = [
+  { icon: '☁️', label: 'Account & Sync', hint: 'Sign in to back up + sync', href: '/auth' },
   { icon: '🍽️', label: 'Meal Preferences', hint: 'Diets, budget, favorites', href: '/settings/meal-preferences' },
   { icon: '🍳', label: 'Cooking History', hint: 'Dishes you’ve made', href: '/cooked' },
   { icon: '⭐', label: 'Review', hint: 'Rate SnackPlan', href: '/settings/review' },

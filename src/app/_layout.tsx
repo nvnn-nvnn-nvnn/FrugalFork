@@ -11,6 +11,7 @@ import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-c
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { Onboarding } from '@/components/onboarding/onboarding';
 import { ThemedView } from '@/components/themed-view';
+import { AuthProvider } from '@/lib/auth/context';
 import { CookbookProvider } from '@/lib/cookbook/context';
 import { PlanProvider } from '@/lib/plan/context';
 import { ProfileProvider, useProfile } from '@/lib/profile/context';
@@ -35,6 +36,7 @@ function AppGate() {
       <Stack.Screen name="dish/[id]" />
       <Stack.Screen name="recipe/new" />
       <Stack.Screen name="cooked" />
+      <Stack.Screen name="auth" />
       <Stack.Screen name="settings/index" />
       <Stack.Screen name="settings/profile" />
       <Stack.Screen name="settings/meal-preferences" />
@@ -51,16 +53,18 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <ProfileProvider>
-          <RecipeProvider>
-            <CookbookProvider>
-              <PlanProvider>
-                <AnimatedSplashOverlay />
-                <AppGate />
-              </PlanProvider>
-            </CookbookProvider>
-          </RecipeProvider>
-        </ProfileProvider>
+        <AuthProvider>
+          <ProfileProvider>
+            <RecipeProvider>
+              <CookbookProvider>
+                <PlanProvider>
+                  <AnimatedSplashOverlay />
+                  <AppGate />
+                </PlanProvider>
+              </CookbookProvider>
+            </RecipeProvider>
+          </ProfileProvider>
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

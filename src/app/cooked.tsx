@@ -160,13 +160,13 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
   },
   thumb: {
-    width: 52,
-    height: 52,
+    width: 44,
+    height: 44,
     borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emoji: { fontSize: 28, lineHeight: 34 },
+  emoji: { fontSize: 24, lineHeight: 30 },
   body: { flex: 1, gap: Spacing.half },
   pressed: { opacity: 0.7 },
 });

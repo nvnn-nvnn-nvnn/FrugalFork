@@ -413,13 +413,13 @@ const styles = StyleSheet.create({
   },
   thumb: {
     width: '100%',
-    height: 240,
+    height: 196,
     alignItems: 'center',
     justifyContent: 'center',
   },
   thumbEmoji: {
-    fontSize: 96,
-    lineHeight: 110,
+    fontSize: 76,
+    lineHeight: 88,
   },
   iconButton: {
     position: 'absolute',
