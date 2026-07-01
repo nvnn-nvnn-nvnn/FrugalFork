@@ -3,16 +3,20 @@ import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, View } fro
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
+import { DishThumb } from '@/components/dish-thumb';
 import { BudgetBar } from '@/components/plan/budget-bar';
+import { usePlusAction } from '@/components/premium/paywall-gate';
 import { ShopMenuSheet } from '@/components/plan/shop-menu-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCookbook } from '@/lib/cookbook/context';
 import { scanReceipt, type ReceiptScan } from '@/lib/ocr';
 import { usePlan } from '@/lib/plan/context';
-import { buildShoppingSections } from '@/lib/plan/planner';
+import { buildRecipeSections, buildShoppingSections } from '@/lib/plan/planner';
 import { RECIPES_BY_ID } from '@/lib/plan/recipes';
+import type { ShoppingItem } from '@/lib/plan/types';
 import { useProfile } from '@/lib/profile/context';
 import { weekRangeLabel } from '@/lib/week/dates';
 
@@ -21,12 +25,17 @@ export default function ShopScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useProfile();
-  const { builder, groceries, spend, addSpend, isChecked, toggleChecked, markAllChecked } = usePlan();
+  const { groceries, spend, addSpend, isChecked, toggleChecked, markAllChecked } = usePlan();
+  const { isSaved } = useCookbook();
+  const guard = usePlusAction();
 
   const [scanning, setScanning] = useState(false);
   const [lastScan, setLastScan] = useState<ReceiptScan | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(false);
+  const [groupBy, setGroupBy] = useState<'aisle' | 'recipe'>('aisle');
+  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,30 +60,102 @@ export default function ShopScreen() {
     prevGroceries.current = groceries;
   }, [groceries]);
 
-  // A dish is only on the list if it's PLANNED and flagged for shopping. Servings
-  // are derived from the plan (summed across days), so the list stays in sync.
-  const shopping = useMemo(() => {
-    const plannedServings = new Map<string, number>();
-    for (const b of builder) {
-      plannedServings.set(b.recipeId, (plannedServings.get(b.recipeId) ?? 0) + b.servings);
-    }
-    const entries = groceries
-      .filter((id) => plannedServings.has(id))
-      .map((id) => ({ recipeId: id, servings: plannedServings.get(id)! }));
-    return entries.length > 0 ? buildShoppingSections(entries) : null;
-  }, [builder, groceries]);
+  // A dish is on the list if it's flagged for shopping AND still saved in a
+  // cookbook — saving is the prerequisite (the plan no longer drives the list).
+  // Each saved dish counts as one serving.
+  const entries = useMemo(
+    () => groceries.filter((id) => isSaved(id)).map((id) => ({ recipeId: id, servings: 1 })),
+    [groceries, isSaved],
+  );
+
+  // Two cuts of the same list: aggregated by aisle, or split out per recipe.
+  const shopping = useMemo(
+    () => (entries.length > 0 ? buildShoppingSections(entries) : null),
+    [entries],
+  );
+  const byRecipe = useMemo(
+    () => (entries.length > 0 ? buildRecipeSections(entries) : null),
+    [entries],
+  );
 
   const allItems = shopping ? shopping.sections.flatMap((s) => s.items) : [];
   const gotCount = allItems.filter((i) => isChecked(i.name)).length;
 
-  // Optionally hide crossed-off items to focus on what's left.
-  const displaySections = !shopping
+  // Optionally hide crossed-off items to focus on what's left. Works for either cut.
+  const hideDone = <T extends { items: ShoppingItem[] }>(sections: T[]): T[] =>
+    !hideCompleted
+      ? sections
+      : sections
+          .map((s) => ({ ...s, items: s.items.filter((i) => !isChecked(i.name)) }))
+          .filter((s) => s.items.length > 0);
+
+  const displaySections = shopping ? hideDone(shopping.sections) : [];
+
+  // "By recipe" is a dropdown: choose one dish, see its ingredients. Default to
+  // the first dish; fall back if the selected one leaves the list.
+  const recipeSections = byRecipe?.sections ?? [];
+  const activeRecipeId =
+    selectedRecipeId && recipeSections.some((s) => s.recipeId === selectedRecipeId)
+      ? selectedRecipeId
+      : (recipeSections[0]?.recipeId ?? null);
+  const activeRecipe = recipeSections.find((s) => s.recipeId === activeRecipeId) ?? null;
+  const activeRecipeItems = !activeRecipe
     ? []
     : hideCompleted
-      ? shopping.sections
-          .map((s) => ({ ...s, items: s.items.filter((i) => !isChecked(i.name)) }))
-          .filter((s) => s.items.length > 0)
-      : shopping.sections;
+      ? activeRecipe.items.filter((i) => !isChecked(i.name))
+      : activeRecipe.items;
+
+  const allDone = allItems.length > 0 && gotCount === allItems.length;
+
+  // One checkable item row, shared by both views. Crossing off is by ingredient
+  // name, so checking "rice" off marks it in every recipe that needs it.
+  const renderItem = (item: ShoppingItem, showDishes: boolean) => {
+    const done = isChecked(item.name);
+    return (
+      <Pressable
+        key={item.name}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: done }}
+        accessibilityLabel={item.name}
+        onPress={() => toggleChecked(item.name)}
+        style={({ pressed }) => [
+          styles.itemRow,
+          { backgroundColor: theme.backgroundElement },
+          done && styles.itemDone,
+          pressed && styles.pressed,
+        ]}>
+        <View
+          style={[
+            styles.checkbox,
+            { borderColor: theme.backgroundSelected },
+            done && { backgroundColor: theme.tint, borderColor: theme.tint },
+          ]}>
+          {done && (
+            <ThemedText type="small" themeColor="onTint" style={styles.check}>
+              ✓
+            </ThemedText>
+          )}
+        </View>
+        <View style={styles.itemBody}>
+          <ThemedText type="smallBold" style={done && styles.struck}>
+            {item.name}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {item.qtys.length > 1 ? `${item.qtys.length}× · ` : ''}
+            {item.qtys.join(', ')}
+          </ThemedText>
+          {showDishes && (
+            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+              for {item.dishes.join(' · ')}
+            </ThemedText>
+          )}
+        </View>
+        <ThemedText type="smallBold" themeColor="textSecondary" style={done && styles.struck}>
+          ${item.cost.toFixed(2)}
+        </ThemedText>
+      </Pressable>
+    );
+  };
 
   const shareList = () => {
     if (!shopping) return;
@@ -99,8 +180,12 @@ export default function ShopScreen() {
     setScanning(true);
     try {
       const result = await scanReceipt();
+      if (!result) return; // user cancelled the picker
       setLastScan(result);
       addSpend(result.total);
+      setFlash(`Logged $${result.total.toFixed(2)} from your receipt`);
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : 'Could not read that receipt.');
     } finally {
       setScanning(false);
     }
@@ -150,7 +235,7 @@ export default function ShopScreen() {
             <Pressable
               accessibilityRole="button"
               disabled={scanning}
-              onPress={onScan}
+              onPress={() => guard('ocr', onScan)}
               style={({ pressed }) => [
                 styles.scanButton,
                 { backgroundColor: theme.tint },
@@ -165,7 +250,7 @@ export default function ShopScreen() {
               )}
             </Pressable>
             <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
-              Placeholder — adds a sample receipt to your spend.
+              Snap a photo — Plus reads the items and total into your spend.
             </ThemedText>
 
             {lastScan && (
@@ -194,19 +279,19 @@ export default function ShopScreen() {
             <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
               <ThemedText type="smallBold">Your list is empty</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                On a planned meal (or a dish page), tap “Add to list” — its ingredients land here as
-                one categorized list.
+                Save a dish to a cookbook, then open it and tap “Add to list” — its ingredients land
+                here as one categorized list.
               </ThemedText>
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.push('/plan')}
+                onPress={() => router.push('/cookbook')}
                 style={({ pressed }) => [
                   styles.emptyCta,
                   { backgroundColor: theme.tint },
                   pressed && styles.pressed,
                 ]}>
                 <ThemedText type="smallBold" themeColor="onTint">
-                  Go to your plan →
+                  Go to your cookbook →
                 </ThemedText>
               </Pressable>
             </View>
@@ -229,7 +314,26 @@ export default function ShopScreen() {
                 Tap an item to cross it off · {gotCount}/{allItems.length} in the cart
               </ThemedText>
 
-              {displaySections.length === 0 && (
+              {/* Group the same list by aisle or by recipe */}
+              <View style={[styles.toggle, { backgroundColor: theme.backgroundElement }]}>
+                {(['aisle', 'recipe'] as const).map((mode) => {
+                  const on = groupBy === mode;
+                  return (
+                    <Pressable
+                      key={mode}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      onPress={() => setGroupBy(mode)}
+                      style={[styles.toggleSeg, on && { backgroundColor: theme.backgroundSelected }]}>
+                      <ThemedText type="smallBold" themeColor={on ? 'text' : 'textSecondary'}>
+                        {mode === 'aisle' ? 'By aisle' : 'By recipe'}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {allDone && (
                 <View style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
                   <ThemedText type="smallBold">All done 🎉</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
@@ -238,67 +342,110 @@ export default function ShopScreen() {
                 </View>
               )}
 
-              {displaySections.map((section) => (
-                <View key={section.category} style={styles.categorySection}>
-                  <View style={styles.categoryHead}>
-                    <ThemedText type="smallBold" themeColor="tint" style={styles.categoryTitle}>
-                      {section.category}
-                    </ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      ${section.cost.toFixed(2)}
-                    </ThemedText>
+              {groupBy === 'aisle' &&
+                displaySections.map((section) => (
+                  <View key={section.category} style={styles.categorySection}>
+                    <View style={styles.categoryHead}>
+                      <ThemedText type="smallBold" themeColor="tint" style={styles.categoryTitle}>
+                        {section.category}
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        ${section.cost.toFixed(2)}
+                      </ThemedText>
+                    </View>
+                    {section.items.map((item) => renderItem(item, true))}
                   </View>
+                ))}
 
-                  {section.items.map((item) => {
-                    const done = isChecked(item.name);
-                    return (
-                      <Pressable
-                        key={item.name}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: done }}
-                        accessibilityLabel={item.name}
-                        onPress={() => toggleChecked(item.name)}
-                        style={({ pressed }) => [
-                          styles.itemRow,
-                          { backgroundColor: theme.backgroundElement },
-                          done && styles.itemDone,
-                          pressed && styles.pressed,
-                        ]}>
-                        <View
-                          style={[
-                            styles.checkbox,
-                            { borderColor: theme.backgroundSelected },
-                            done && { backgroundColor: theme.tint, borderColor: theme.tint },
-                          ]}>
-                          {done && (
-                            <ThemedText type="small" themeColor="onTint" style={styles.check}>
-                              ✓
+              {groupBy === 'recipe' && activeRecipe && (
+                <>
+                  {/* Recipe dropdown: choose a dish to see its ingredients */}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Choose a recipe — ${activeRecipe.title} selected`}
+                    accessibilityState={{ expanded: pickerOpen }}
+                    onPress={() => setPickerOpen((o) => !o)}
+                    style={({ pressed }) => [
+                      styles.dropdown,
+                      { backgroundColor: theme.backgroundElement },
+                      pressed && styles.pressed,
+                    ]}>
+                    <DishThumb
+                      recipeId={activeRecipe.recipeId}
+                      emoji={activeRecipe.emoji}
+                      image={activeRecipe.image}
+                      emojiSize={20}
+                      radius={Radius.sm}
+                      backgroundColor={theme.background}
+                      style={styles.dropThumb}
+                    />
+                    <View style={styles.dropBody}>
+                      <ThemedText type="smallBold" numberOfLines={1}>
+                        {activeRecipe.title}
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {activeRecipe.items.length} ingredient{activeRecipe.items.length === 1 ? '' : 's'} ·
+                        ${activeRecipe.cost.toFixed(2)}
+                      </ThemedText>
+                    </View>
+                    <ThemedText type="smallBold" themeColor="textSecondary">
+                      {pickerOpen ? '▴' : '▾'}
+                    </ThemedText>
+                  </Pressable>
+
+                  {pickerOpen ? (
+                    <View style={[styles.dropList, { backgroundColor: theme.backgroundElement }]}>
+                      {recipeSections.map((sec, i) => {
+                        const on = sec.recipeId === activeRecipeId;
+                        return (
+                          <Pressable
+                            key={sec.recipeId}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: on }}
+                            onPress={() => {
+                              setSelectedRecipeId(sec.recipeId);
+                              setPickerOpen(false);
+                            }}
+                            style={({ pressed }) => [
+                              styles.dropOption,
+                              i > 0 && {
+                                borderTopWidth: StyleSheet.hairlineWidth,
+                                borderTopColor: theme.backgroundSelected,
+                              },
+                              (on || pressed) && { backgroundColor: theme.backgroundSelected },
+                            ]}>
+                            <DishThumb
+                              recipeId={sec.recipeId}
+                              emoji={sec.emoji}
+                              image={sec.image}
+                              emojiSize={20}
+                              radius={Radius.sm}
+                              backgroundColor={theme.background}
+                              style={styles.dropThumb}
+                            />
+                            <ThemedText type="smallBold" numberOfLines={1} style={styles.dropOptionTitle}>
+                              {sec.title}
                             </ThemedText>
-                          )}
-                        </View>
-                        <View style={styles.itemBody}>
-                          <ThemedText type="smallBold" style={done && styles.struck}>
-                            {item.name}
-                          </ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            {item.qtys.length > 1 ? `${item.qtys.length}× · ` : ''}
-                            {item.qtys.join(', ')}
-                          </ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                            for {item.dishes.join(' · ')}
-                          </ThemedText>
-                        </View>
-                        <ThemedText
-                          type="smallBold"
-                          themeColor="textSecondary"
-                          style={done && styles.struck}>
-                          ${item.cost.toFixed(2)}
+                            <ThemedText type="small" themeColor="textSecondary">
+                              ${sec.cost.toFixed(2)}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View style={styles.categorySection}>
+                      {activeRecipeItems.length === 0 ? (
+                        <ThemedText type="small" themeColor="textSecondary">
+                          Everything for this dish is crossed off.
                         </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ))}
+                      ) : (
+                        activeRecipeItems.map((item) => renderItem(item, false))
+                      )}
+                    </View>
+                  )}
+                </>
+              )}
             </View>
           )}
         </View>
@@ -352,7 +499,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: Radius.md,
-    padding: Spacing.four,
+    padding: Spacing.three,
     gap: Spacing.three,
   },
   emptyCta: {
@@ -362,11 +509,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
   },
   scanButton: {
-    paddingVertical: Spacing.three,
+    paddingVertical: Spacing.two,
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 40,
   },
   centerText: { textAlign: 'center' },
   receipt: {
@@ -378,6 +525,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  toggle: {
+    flexDirection: 'row',
+    borderRadius: Radius.md,
+    padding: Spacing.half,
+  },
+  toggleSeg: {
+    flex: 1,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+  },
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    padding: Spacing.three,
+    borderRadius: Radius.md,
+  },
+  dropThumb: { width: 36, height: 36 },
+  dropBody: { flex: 1, gap: Spacing.half },
+  dropList: {
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+  },
+  dropOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    padding: Spacing.three,
+  },
+  dropOptionTitle: { flex: 1 },
   listSection: { gap: Spacing.three },
   listHeader: {
     flexDirection: 'row',

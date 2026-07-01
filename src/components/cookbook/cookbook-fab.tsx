@@ -43,12 +43,12 @@ const styles = StyleSheet.create({
     bottom: BottomTabInset + Spacing.four,
   },
   fab: {
-    width: 60,
-    height: 60,
+    width: 50,
+    height: 50,
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fabIcon: { fontSize: 34, lineHeight: 40, fontWeight: '400' },
+  fabIcon: { fontSize: 28, lineHeight: 34, fontWeight: '400' },
   pressed: { opacity: 0.85 },
 });

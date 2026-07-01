@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Href, useRouter } from 'expo-router';
 
 import { SaveToCookbookSheet } from '@/components/cookbook/save-sheet';
+import { DishThumb } from '@/components/dish-thumb';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Radius, Shadow, ShadowSoft, Spacing } from '@/constants/theme';
@@ -150,7 +151,15 @@ export default function DiscoverScreen() {
                           { backgroundColor: theme.background },
                           pressed && styles.pressed,
                         ]}>
-                        <ThemedText style={styles.thumbEmoji}>{recipe.emoji}</ThemedText>
+                        <DishThumb
+                          recipeId={recipe.id}
+                          emoji={recipe.emoji}
+                          image={recipe.image}
+                          emojiSize={34}
+                          radius={Radius.md}
+                          backgroundColor="transparent"
+                          style={StyleSheet.absoluteFill}
+                        />
                       </Pressable>
 
                       <Pressable
@@ -272,7 +281,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbEmoji: { fontSize: 44, lineHeight: 50 },
   addBadge: {
     ...ShadowSoft,
     position: 'absolute',

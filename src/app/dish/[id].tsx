@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { CookingMode } from '@/components/cooking-mode';
+import { DishThumb } from '@/components/dish-thumb';
 import { AddToPlanSheet } from '@/components/plan/add-to-plan-sheet';
 import { SaveToCookbookSheet } from '@/components/cookbook/save-sheet';
 import { ThemedText } from '@/components/themed-text';
@@ -12,7 +13,10 @@ import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { IS_ADMIN } from '@/lib/admin';
 import { useCookbook } from '@/lib/cookbook/context';
+import { useDishImages } from '@/lib/dish-image/context';
+import { pickMealPhoto } from '@/lib/photo';
 import { usePlan } from '@/lib/plan/context';
 import { DIETS, recipeSatisfiesDiet } from '@/lib/plan/diets';
 import {
@@ -36,6 +40,7 @@ export default function DishScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { builder, addToBuilder, isInGroceries, toggleGrocery } = usePlan();
   const { isSaved, saveToDefault } = useCookbook();
+  const { getImage, setImage } = useDishImages();
 
   const [tab, setTab] = useState<Tab>('Ingredients');
   const [showInfo, setShowInfo] = useState(false);
@@ -71,8 +76,9 @@ export default function DishScreen() {
 
   const saved = isSaved(recipe.id);
   const planned = builder.some((b) => b.recipeId === recipe.id);
-  // A dish can only be on the shopping list if it's planned.
-  const onList = planned && isInGroceries(recipe.id);
+  // The shopping list is driven by cookbook saves now — a dish just needs to be
+  // saved (the "Add to list" action ensures that), not planned.
+  const onList = isInGroceries(recipe.id);
   const statusBits = [
     saved && '✓ Saved',
     planned && '🗓 Planned',
@@ -89,16 +95,15 @@ export default function DishScreen() {
   };
 
   const handleAddToShop = () => {
-    if (!planned) {
-      setFlash('Add this dish to your plan first — then it can go on your list.');
-      return;
-    }
     if (onList) {
       setConfirmRemove(true);
       return;
     }
+    // A dish must be saved to be on the list — save it to the default cookbook
+    // first if it isn't already, then flag it.
+    if (!saved) saveToDefault(recipe.id);
     toggleGrocery(recipe.id);
-    setFlash('Added to your list');
+    setFlash(saved ? 'Added to your list' : 'Saved & added to your list');
   };
 
   const handleShare = () => {
@@ -107,12 +112,32 @@ export default function DishScreen() {
     }).catch(() => {});
   };
 
+  // Premade (curated) dishes are read-only for normal users — only the dish's
+  // creator, or an admin, may set a photo. (Curated dish photos ship via the
+  // `image` field in recipes.ts; see docs/10-editing-dishes.md.)
+  const canEditPhoto = recipe.userCreated === true || IS_ADMIN;
+  const hasPhoto = !!(getImage(recipe.id) ?? recipe.image);
+  const changePhoto = async () => {
+    const uri = await pickMealPhoto();
+    if (!uri) return; // cancelled or denied
+    setImage(recipe.id, uri);
+    setFlash('Thumbnail updated');
+  };
+
   return (
     <ThemedView style={styles.root}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.six }]}>
         {/* Thumbnail with overlaid back + "..." controls */}
         <View style={[styles.thumb, { backgroundColor: theme.backgroundElement }]}>
-          <ThemedText style={styles.thumbEmoji}>{recipe.emoji}</ThemedText>
+          <DishThumb
+            recipeId={recipe.id}
+            emoji={recipe.emoji}
+            image={recipe.image}
+            emojiSize={56}
+            radius={0}
+            backgroundColor="transparent"
+            style={StyleSheet.absoluteFill}
+          />
 
           <Pressable
             accessibilityRole="button"
@@ -137,6 +162,21 @@ export default function DishScreen() {
             ]}>
             <ThemedText type="smallBold">⋯</ThemedText>
           </Pressable>
+
+          {canEditPhoto && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={hasPhoto ? 'Change dish photo' : 'Add a dish photo'}
+              onPress={changePhoto}
+              style={({ pressed }) => [
+                styles.photoButton,
+                Shadow,
+                { backgroundColor: theme.background },
+                pressed && styles.pressed,
+              ]}>
+              <ThemedText type="smallBold">{hasPhoto ? '📷 Change photo' : '📷 Add photo'}</ThemedText>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.inner}>
@@ -413,13 +453,17 @@ const styles = StyleSheet.create({
   },
   thumb: {
     width: '100%',
-    height: 196,
+    height: 150,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  thumbEmoji: {
-    fontSize: 76,
-    lineHeight: 88,
+  photoButton: {
+    position: 'absolute',
+    bottom: Spacing.three,
+    right: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: Radius.full,
   },
   iconButton: {
     position: 'absolute',

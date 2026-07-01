@@ -67,12 +67,12 @@ export const Fonts = Platform.select({
 
 export const Spacing = {
   half: 2,
-  one: 4,
-  two: 8,
-  three: 14,
-  four: 20,
-  five: 28,
-  six: 56,
+  one: 3,
+  two: 6,
+  three: 10,
+  four: 14,
+  five: 20,
+  six: 40,
 } as const;
 
 /**
@@ -92,11 +92,11 @@ export const ShadowSoft = { boxShadow: '0px 2px 8px rgba(33, 26, 18, 0.10)' } as
  */
 export const Radius = {
   /** Chips, small insets, segmented-control thumbs. */
-  sm: 4,
+  sm: 2,
   /** Buttons, inputs, list rows. */
-  md: 7,
+  md: 4,
   /** Cards, sheets, the account/avatar tile. */
-  lg: 10,
+  lg: 6,
   /** Fully rounded — progress bars, true pills. */
   full: 999,
 } as const;

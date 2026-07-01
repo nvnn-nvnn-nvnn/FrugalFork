@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { usePremium } from '@/lib/premium/context';
 import { useProfile } from '@/lib/profile/context';
 
 type MenuItem = {
@@ -30,6 +31,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { profile } = useProfile();
+  const { isPlus } = usePremium();
 
   const hasAccount = profile.name.trim().length > 0 || profile.email.trim().length > 0;
   const initial = (profile.name.trim()[0] ?? '🙂').toUpperCase();
@@ -84,6 +86,33 @@ export default function SettingsScreen() {
               </ThemedText>
             </View>
             <ThemedText type="subtitle" themeColor="textSecondary" style={styles.chevron}>
+              ›
+            </ThemedText>
+          </Pressable>
+
+          {/* SnackPlan Plus */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isPlus ? 'Manage SnackPlan Plus' : 'Upgrade to SnackPlan Plus'}
+            onPress={() => router.push('/paywall')}
+            style={({ pressed }) => [
+              styles.plus,
+              { backgroundColor: isPlus ? theme.backgroundElement : theme.tint },
+              pressed && styles.pressed,
+            ]}>
+            <ThemedText style={styles.plusIcon}>✦</ThemedText>
+            <View style={styles.plusBody}>
+              <ThemedText type="smallBold" themeColor={isPlus ? 'text' : 'onTint'}>
+                {isPlus ? 'SnackPlan Plus — active' : 'Upgrade to SnackPlan Plus'}
+              </ThemedText>
+              <ThemedText type="small" themeColor={isPlus ? 'textSecondary' : 'onTint'}>
+                {isPlus ? 'Manage your subscription' : 'OCR, sync, unlimited cookbooks & more'}
+              </ThemedText>
+            </View>
+            <ThemedText
+              type="subtitle"
+              themeColor={isPlus ? 'textSecondary' : 'onTint'}
+              style={styles.chevron}>
               ›
             </ThemedText>
           </Pressable>
@@ -148,15 +177,25 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
   },
   avatar: {
-    width: 56,
-    height: 56,
+    width: 44,
+    height: 44,
     borderRadius: Radius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { lineHeight: 40 },
+  avatarText: { lineHeight: 32 },
   accountBody: { flex: 1, gap: Spacing.half },
-  accountName: { fontSize: 22, lineHeight: 28 },
+  accountName: { fontSize: 18, lineHeight: 24 },
+  plus: {
+    ...Shadow,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    padding: Spacing.three,
+    borderRadius: Radius.lg,
+  },
+  plusIcon: { fontSize: 22, lineHeight: 28, width: 28, textAlign: 'center' },
+  plusBody: { flex: 1, gap: Spacing.half },
   menu: {
     ...Shadow,
     borderRadius: Radius.lg,

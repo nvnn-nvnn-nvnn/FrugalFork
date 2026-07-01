@@ -5,14 +5,22 @@ import { useRouter } from 'expo-router';
 
 import { CookbookSettingsSheet } from '@/components/cookbook/cookbook-settings-sheet';
 import { DishOptionsSheet } from '@/components/cookbook/dish-options-sheet';
+import { ImportLinkSheet } from '@/components/cookbook/import-link-sheet';
 import { RecipeInputSheet } from '@/components/cookbook/recipe-input-sheet';
+import { DishThumb } from '@/components/dish-thumb';
 import { AddToPlanSheet } from '@/components/plan/add-to-plan-sheet';
+import { usePlusAction } from '@/components/premium/paywall-gate';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Shadow, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { DEFAULT_COOKBOOK_ID, type Cookbook, useCookbook } from '@/lib/cookbook/context';
+import { scanRecipePhoto } from '@/lib/ocr';
 import { usePlan } from '@/lib/plan/context';
 import { RECIPES_BY_ID } from '@/lib/plan/recipes';
+import type { Recipe } from '@/lib/plan/types';
+import { extractedToRecipe } from '@/lib/recipes/extracted';
+import { importRecipeFromUrl } from '@/lib/recipes/import';
+import { useRecipes } from '@/lib/recipes/context';
 import { WEEKDAYS } from '@/lib/week/dates';
 
 type Sort = 'recent' | 'az';
@@ -32,12 +40,15 @@ export function CookbookView({ onOpenChange }: Props) {
   const router = useRouter();
   const { cookbooks, toggleDish, moveDish } = useCookbook();
   const { addToBuilder } = usePlan();
+  const { addRecipe } = useRecipes();
+  const guard = usePlusAction();
 
   const [sort, setSort] = useState<Sort>('recent');
   const [openId, setOpenId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [optionsFor, setOptionsFor] = useState<string | null>(null);
   const [recipeMenuOpen, setRecipeMenuOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [gridWidth, setGridWidth] = useState(0);
 
   // "Add to plan" modal — which dish is being scheduled.
@@ -59,6 +70,36 @@ export function CookbookView({ onOpenChange }: Props) {
   const open = openId ? cookbooks.find((c) => c.id === openId) : null;
   const tileWidth = gridWidth > 0 ? (gridWidth - Spacing.three) / 2 : 0;
   const onGridLayout = (e: LayoutChangeEvent) => setGridWidth(e.nativeEvent.layout.width);
+
+  // Save a scanned/imported recipe, file it into the open (or default) cookbook,
+  // and jump to its detail page.
+  const fileAndOpen = (recipe: Recipe) => {
+    addRecipe(recipe);
+    toggleDish(openId ?? DEFAULT_COOKBOOK_ID, recipe.id);
+    router.push({ pathname: '/dish/[id]', params: { id: recipe.id } });
+  };
+
+  const runScan = async () => {
+    setFlash('Reading your recipe…');
+    try {
+      const extracted = await scanRecipePhoto();
+      if (!extracted) return setFlash(null); // cancelled
+      fileAndOpen(extractedToRecipe(extracted));
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : 'Could not read that photo.');
+    }
+  };
+
+  const submitImport = async (url: string) => {
+    setImportOpen(false);
+    setFlash('Importing recipe…');
+    try {
+      const extracted = await importRecipeFromUrl(url);
+      fileAndOpen(extractedToRecipe(extracted));
+    } catch (e) {
+      setFlash(e instanceof Error ? e.message : 'Could not find a recipe at that link.');
+    }
+  };
 
   const openCookbook = (cb: Cookbook) => {
     setOpenId(cb.id);
@@ -156,9 +197,15 @@ export function CookbookView({ onOpenChange }: Props) {
                     onPress={() => router.push({ pathname: '/dish/[id]', params: { id: recipeId } })}
                     onLongPress={() => setOptionsFor(recipeId)}
                     style={({ pressed }) => [styles.dishTap, pressed && styles.pressed]}>
-                    <View style={[styles.thumb, { backgroundColor: theme.background }]}>
-                      <ThemedText style={styles.emoji}>{recipe.emoji}</ThemedText>
-                    </View>
+                    <DishThumb
+                      recipeId={recipeId}
+                      emoji={recipe.emoji}
+                      image={recipe.image}
+                      emojiSize={26}
+                      radius={Radius.md}
+                      backgroundColor={theme.background}
+                      style={styles.thumb}
+                    />
                     <View style={styles.dishBody}>
                       <ThemedText type="smallBold" numberOfLines={1} style={styles.dishTitle}>
                         {recipe.title}
@@ -354,7 +401,7 @@ export function CookbookView({ onOpenChange }: Props) {
         onClose={() => setRecipeMenuOpen(false)}
         onImport={() => {
           setRecipeMenuOpen(false);
-          setFlash('Importing from a link is coming soon.');
+          guard('recipeImport', () => setImportOpen(true));
         }}
         onUpload={() => {
           setRecipeMenuOpen(false);
@@ -362,8 +409,14 @@ export function CookbookView({ onOpenChange }: Props) {
         }}
         onScan={() => {
           setRecipeMenuOpen(false);
-          setFlash('Recipe scanning (OCR) is coming soon.');
+          guard('ocr', runScan);
         }}
+      />
+
+      <ImportLinkSheet
+        visible={importOpen}
+        onClose={() => setImportOpen(false)}
+        onSubmit={submitImport}
       />
     </View>
   );
@@ -472,7 +525,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emoji: { fontSize: 26, lineHeight: 32 },
   dishBody: { flex: 1, gap: Spacing.half },
   dishTitle: { fontSize: 15, lineHeight: 20 },
   dishMeta: { fontSize: 13, lineHeight: 17 },

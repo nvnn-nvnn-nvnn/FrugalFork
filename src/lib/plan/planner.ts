@@ -5,6 +5,17 @@ import type { BuilderItem, GroceryEntry, ShoppingItem } from './types';
 /** A category group of the shopping list (e.g. "Produce" with its items). */
 export type ShoppingSection = { category: string; items: ShoppingItem[]; cost: number };
 
+/** A per-recipe group of the shopping list (every ingredient that dish needs). */
+export type RecipeShoppingSection = {
+  recipeId: string;
+  title: string;
+  emoji: string;
+  /** Baked-in thumbnail (for the recipe picker), if the dish has one. */
+  image?: string;
+  items: ShoppingItem[];
+  cost: number;
+};
+
 /**
  * Helpers over the meal builder (the source of truth). The Plan and Shop screens
  * derive everything — cost, calories, the shopping list — from the builder items.
@@ -84,5 +95,43 @@ export function buildShoppingSections(entries: GroceryEntry[]): {
       cost: round(its.reduce((sum, i) => sum + i.cost, 0)),
     }));
 
+  return { sections, total };
+}
+
+/**
+ * The shopping list grouped **by recipe** instead of by aisle: one section per
+ * planned dish, listing exactly the ingredients that dish needs (amounts + costs
+ * scaled by its servings). Same dishes/servings as `buildShoppingSections` — just
+ * a different cut, so the two views always total the same.
+ */
+export function buildRecipeSections(entries: GroceryEntry[]): {
+  sections: RecipeShoppingSection[];
+  total: number;
+} {
+  const sections: RecipeShoppingSection[] = [];
+
+  for (const { recipeId, servings } of entries) {
+    const recipe = RECIPES_BY_ID[recipeId];
+    if (!recipe) continue;
+
+    const items: ShoppingItem[] = recipe.ingredients.map((ing) => ({
+      name: ing.name,
+      qtys: [scaleQty(ing.qty, servings)],
+      cost: round(ing.cost * servings),
+      dishes: [recipe.title],
+    }));
+    const cost = round(items.reduce((sum, i) => sum + i.cost, 0));
+
+    sections.push({
+      recipeId,
+      title: recipe.title,
+      emoji: recipe.emoji,
+      image: recipe.image,
+      items,
+      cost,
+    });
+  }
+
+  const total = round(sections.reduce((sum, s) => sum + s.cost, 0));
   return { sections, total };
 }

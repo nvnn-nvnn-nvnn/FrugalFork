@@ -38,4 +38,12 @@ export const StorageKeys = {
   userRecipes: 'snackplan.userRecipes.v1',
   /** History of cooked/eaten dishes (the finished-dishes log). */
   cookedLog: 'snackplan.cookedLog.v1',
+  /**
+   * Premium entitlement. Today this only holds the DEV override flag; once real
+   * IAP (RevenueCat/StoreKit) is wired, the source of truth becomes the store and
+   * this key is just a local cache of the last-known entitlement.
+   */
+  premium: 'snackplan.premium.v1',
+  /** Per-dish thumbnail photos: recipeId → local image URI. */
+  dishImages: 'snackplan.dishImages.v1',
 } as const;

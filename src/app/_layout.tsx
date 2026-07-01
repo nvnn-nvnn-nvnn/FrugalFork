@@ -13,7 +13,9 @@ import { Onboarding } from '@/components/onboarding/onboarding';
 import { ThemedView } from '@/components/themed-view';
 import { AuthProvider } from '@/lib/auth/context';
 import { CookbookProvider } from '@/lib/cookbook/context';
+import { DishImageProvider } from '@/lib/dish-image/context';
 import { PlanProvider } from '@/lib/plan/context';
+import { PremiumProvider } from '@/lib/premium/context';
 import { ProfileProvider, useProfile } from '@/lib/profile/context';
 import { RecipeProvider, useRecipes } from '@/lib/recipes/context';
 
@@ -37,6 +39,7 @@ function AppGate() {
       <Stack.Screen name="recipe/new" />
       <Stack.Screen name="cooked" />
       <Stack.Screen name="auth" />
+      <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
       <Stack.Screen name="settings/index" />
       <Stack.Screen name="settings/profile" />
       <Stack.Screen name="settings/meal-preferences" />
@@ -58,8 +61,12 @@ export default function RootLayout() {
             <RecipeProvider>
               <CookbookProvider>
                 <PlanProvider>
-                  <AnimatedSplashOverlay />
-                  <AppGate />
+                  <PremiumProvider>
+                    <DishImageProvider>
+                      <AnimatedSplashOverlay />
+                      <AppGate />
+                    </DishImageProvider>
+                  </PremiumProvider>
                 </PlanProvider>
               </CookbookProvider>
             </RecipeProvider>

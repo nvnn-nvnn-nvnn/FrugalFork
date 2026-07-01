@@ -48,6 +48,13 @@ export type Recipe = {
   ingredients: Ingredient[];
   /** Real step-by-step instructions (user-created recipes). Falls back to a generator if absent. */
   steps?: string[];
+  /**
+   * Baked-in thumbnail photo for a curated dish — an image URL that ships with
+   * the app, so every user sees it. Set this in `recipes.ts` (admin/data only).
+   * If absent the emoji is shown. A user's own per-device photo (set in the app)
+   * takes precedence over this — see `src/lib/dish-image/context.tsx`.
+   */
+  image?: string;
   /** True for recipes the user created/imported (vs the curated library). */
   userCreated?: boolean;
 };

@@ -12,6 +12,15 @@ const INGREDIENT_CATEGORY: Record<string, string> = {
   'canned chickpeas': 'Protein',
   'red lentils': 'Protein',
   'peanut butter': 'Protein',
+  'canned tuna': 'Protein',
+  sardines: 'Protein',
+  tofu: 'Protein',
+  'ground beef': 'Protein',
+  bacon: 'Protein',
+  ham: 'Protein',
+  sausage: 'Protein',
+  hummus: 'Protein',
+  'baked beans': 'Protein',
   // Produce
   banana: 'Produce',
   onion: 'Produce',
@@ -21,11 +30,25 @@ const INGREDIENT_CATEGORY: Record<string, string> = {
   'mixed greens': 'Produce',
   cucumber: 'Produce',
   potato: 'Produce',
+  avocado: 'Produce',
+  lemon: 'Produce',
+  'sweet potato': 'Produce',
+  'bell pepper': 'Produce',
+  mushroom: 'Produce',
+  spinach: 'Produce',
+  corn: 'Produce',
+  peas: 'Produce',
+  cabbage: 'Produce',
+  'spring onion': 'Produce',
+  lettuce: 'Produce',
   // Dairy
   milk: 'Dairy',
   butter: 'Dairy',
   yogurt: 'Dairy',
   cheese: 'Dairy',
+  'cream cheese': 'Dairy',
+  feta: 'Dairy',
+  parmesan: 'Dairy',
   // Spices / sauces
   'soy sauce': 'Spices & sauces',
   'chili oil': 'Spices & sauces',
@@ -33,7 +56,10 @@ const INGREDIENT_CATEGORY: Record<string, string> = {
   salsa: 'Spices & sauces',
   dressing: 'Spices & sauces',
   'stock cube': 'Spices & sauces',
-  // Pantry (default for the rest)
+  'olive oil': 'Spices & sauces',
+  mayo: 'Spices & sauces',
+  // Pantry (default for the rest): flour, bagel, granola, honey, couscous,
+  // quinoa, pita, bread, rice, pasta, tortilla, instant noodles, canned tomatoes
 };
 
 /** Display order for grocery categories. */

@@ -1,36 +1,54 @@
+import * as ImagePicker from 'expo-image-picker';
+
+import { invokeExtract } from '@/lib/extract/client';
+import type { ExtractedRecipe } from '@/lib/recipes/extracted';
+
 /**
- * OCR + camera PLACEHOLDER.
+ * Real OCR via the `extract` Edge Function (Claude vision). The user picks/takes
+ * a photo, we send the base64 to the server, and get back structured data.
  *
- * Real receipt OCR and meal-photo capture need native modules (camera, an OCR
- * engine or a vision API). Until those are wired, these stubs return canned data
- * after a short delay so the UI and data flow can be built and tested end-to-end.
- *
- * Swap the bodies for expo-image-picker + a vision/OCR call; the signatures and
- * return shapes are the contract the screens already depend on.
+ * Each function returns `null` when the user cancels the picker, and throws a
+ * user-readable error if the extraction itself fails — callers surface that.
  */
 
 export type ReceiptLine = { name: string; cost: number };
 export type ReceiptScan = { items: ReceiptLine[]; total: number };
 
-const SAMPLE_RECEIPT: ReceiptScan = {
-  items: [
-    { name: 'rice 2kg', cost: 4.5 },
-    { name: 'eggs x12', cost: 3.2 },
-    { name: 'canned beans x4', cost: 3.6 },
-    { name: 'frozen veg 1kg', cost: 2.5 },
-    { name: 'pasta 1kg', cost: 1.8 },
-    { name: 'onions 1kg', cost: 1.2 },
-    { name: 'milk 2L', cost: 2.4 },
-  ],
-  total: 19.2,
-};
+type Capture = { image: string; imageType: string };
 
-function delay(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+/**
+ * Open the photo library and return the chosen image as base64. (Swap
+ * `launchImageLibraryAsync` for `launchCameraAsync` to shoot directly — same
+ * options/result shape; the library path also works on web and simulators.)
+ */
+async function captureImage(): Promise<Capture | null> {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) return null;
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    quality: 0.5, // smaller payload — OCR doesn't need full resolution
+    base64: true,
+  });
+  if (result.canceled) return null;
+
+  const asset = result.assets[0];
+  if (!asset?.base64) return null;
+  return { image: asset.base64, imageType: asset.mimeType ?? 'image/jpeg' };
 }
 
-/** PLACEHOLDER: pretend to open the camera, scan a receipt, and parse it. */
-export async function scanReceipt(): Promise<ReceiptScan> {
-  await delay(900);
-  return SAMPLE_RECEIPT;
+/** Scan a grocery receipt into line items + total. Null if the user cancels. */
+export async function scanReceipt(): Promise<ReceiptScan | null> {
+  const capture = await captureImage();
+  if (!capture) return null;
+  const { receipt } = await invokeExtract<{ receipt: ReceiptScan }>({ kind: 'receipt', ...capture });
+  return receipt;
+}
+
+/** Scan a recipe from a photo/screenshot. Null if the user cancels. */
+export async function scanRecipePhoto(): Promise<ExtractedRecipe | null> {
+  const capture = await captureImage();
+  if (!capture) return null;
+  const { recipe } = await invokeExtract<{ recipe: ExtractedRecipe }>({ kind: 'recipe', ...capture });
+  return recipe;
 }

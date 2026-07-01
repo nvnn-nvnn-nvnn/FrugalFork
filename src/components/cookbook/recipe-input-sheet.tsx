@@ -122,13 +122,13 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
   },
   iconTile: {
-    width: 44,
-    height: 44,
+    width: 36,
+    height: 36,
     borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: { fontSize: 22, lineHeight: 28 },
+  icon: { fontSize: 18, lineHeight: 24 },
   body: { flex: 1, gap: Spacing.half },
   chevron: { lineHeight: 28 },
   cancel: {

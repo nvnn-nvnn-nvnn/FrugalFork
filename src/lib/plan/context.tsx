@@ -38,9 +38,9 @@ type PlanContextValue = {
   /** Attach (or clear) a meal photo. */
   setPhoto: (id: string, photo: string | null) => void;
 
-  // --- Groceries: which PLANNED dishes are on the shopping list ------------
-  // A dish can only be on the list if it's currently in the plan; servings are
-  // derived from the plan (Shop reads them), so the list always stays in sync.
+  // --- Groceries: which SAVED dishes are on the shopping list -------------
+  // A dish can only be on the list if it's saved in a cookbook (the prerequisite);
+  // Shop filters by that, so flags for unsaved dishes simply don't show.
   /** Recipe ids flagged for shopping. */
   groceries: string[];
   /** True if `recipeId` is flagged for shopping. */
@@ -186,20 +186,9 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
   );
 
   const removeItem = useCallback(
-    (id: string) => {
-      const removed = builder.find((b) => b.id === id);
-      const next = builder.filter((b) => b.id !== id);
-      persist(next);
-      // If that dish is no longer planned anywhere, drop it from the shopping list too.
-      if (removed && !next.some((b) => b.recipeId === removed.recipeId)) {
-        setGroceries((g) => {
-          const ng = g.filter((id) => id !== removed.recipeId);
-          if (ng.length === g.length) return g;
-          saveJSON(StorageKeys.groceries, ng);
-          return ng;
-        });
-      }
-    },
+    // The shopping list is driven by cookbook saves, not the plan, so removing a
+    // planned meal no longer touches the groceries list.
+    (id: string) => persist(builder.filter((b) => b.id !== id)),
     [builder, persist],
   );
 

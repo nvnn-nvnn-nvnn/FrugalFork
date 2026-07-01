@@ -42,39 +42,39 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 
 const styles = StyleSheet.create({
   small: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: 500,
   },
   smallBold: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: 700,
   },
   default: {
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 14,
+    lineHeight: 19,
     fontWeight: 500,
   },
   title: {
     fontFamily: Fonts.serif,
-    fontSize: 30,
+    fontSize: 23,
     fontWeight: 600,
-    lineHeight: 34,
-    letterSpacing: -0.4,
+    lineHeight: 27,
+    letterSpacing: -0.3,
   },
   subtitle: {
     fontFamily: Fonts.serif,
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: 600,
     letterSpacing: -0.2,
   },
   eyebrow: {
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: 700,
-    letterSpacing: 1.4,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   link: {
